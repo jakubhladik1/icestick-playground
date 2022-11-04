@@ -16,51 +16,32 @@
 #
 
 PROJ = top
-
 PIN_DEF = top.pcf
 DEVICE = hx1k
 PACKAGE = tq144
 
-all: $(PROJ).rpt $(PROJ).bin
+all: build/$(PROJ).rpt build/$(PROJ).bin prog
 
--include top.sv.d
+-include build/top.sv.d
 
-%.json: %.sv
-	yosys -q -E $*.sv.d -p 'read_verilog -sv $< ; hierarchy -top top -libdir . ; synth_ice40 -top top -json $@' 
+build/%.json: rtl/%.sv
+	mkdir -p $(@D)
+	yosys -q -E build/$*.sv.d -p 'read_verilog -sv $< ; hierarchy -top top -libdir rtl ; synth_ice40 -top top -json $@' 
 
 %.asc: $(PIN_DEF) %.json
 	nextpnr-ice40 -q --$(DEVICE) --package $(PACKAGE) --asc $@ --pcf $< --json $*.json
 
-%.bin: %.asc
+build/%.bin: build/%.asc
 	icepack $< $@
 
-%.rpt: %.asc
+build/%.rpt: build/%.asc
 	icetime -d $(DEVICE) -mtr $@ $<
 
-%_tb: %_tb.sv %.sv
-	iverilog -o $@ $^
-
-%_tb.vcd: %_tb
-	vvp -N $< +vcd=$@
-
-%_syn.sv: %.json
-	yosys -p 'read_json $^; write_verilog $@'
-
-%_syntb: %_tb.sv %_syn.sv
-	iverilog -o $@ $^ `yosys-config --datdir/ice40/cells_sim.v`
-
-%_syntb.vcd: %_syntb
-	vvp -N $< +vcd=$@
-
-sim: $(PROJ)_tb.vcd
-
-postsim: $(PROJ)_syntb.vcd
-
-prog: $(PROJ).bin
+prog: build/$(PROJ).bin
 	iceprog $<
 
 clean:
-	rm -f $(PROJ).json $(PROJ).asc $(PROJ).rpt $(PROJ).bin $(PROJ).sv.d
+	rm -rf build
 
 .SECONDARY:
 .PHONY: all prog clean

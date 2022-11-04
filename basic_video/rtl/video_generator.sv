@@ -80,7 +80,7 @@ module video_generator #(
 
     always_ff @(posedge clk_i, posedge rst_i) begin
         if (rst_i) begin
-            den_q  <= 1'b0;
+            den_q <= 1'b0;
             pix_q <= 1'b0;
         end else begin
             den_q <= den_d;
