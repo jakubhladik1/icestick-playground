@@ -17,34 +17,30 @@
 
 `default_nettype none
 
-module serializer_10_to_1 (
-    input  wire       clk_i,
-    input  wire       rst_i,
-    input  wire [9:0] d_i,
-    output wire       ser_o
+module synchronizer #(
+    parameter logic        InitialValue = 1'b1,
+    parameter int unsigned NumStages    = 2
+) (
+    input  wire clk_i,
+    input  wire rst_i,
+    input  wire sig_i,
+    output wire sig_o
 );
 
-    logic [3:0] cnt_d, cnt_q;
-    logic [9:0] sreg_d, sreg_q;
+    logic [NumStages-1:0] sync_q, sync_d;
 
-    // Create a 0-9 counter
-    assign cnt_d = cnt_q == 4'd9 ? 4'd0 : cnt_q + 4'd1;
-
-    // Create a shift register which parallel loads after cnt_q is 9
-    assign sreg_d = cnt_q == 4'd9 ? d_i : {1'b0, sreg_q[9:1]};
+    // Create a chain of flip-flops to synchronize the input signal
+    assign sync_d = {sync_q[NumStages-2:0], sig_i};
 
     always_ff @(posedge clk_i, posedge rst_i) begin
         if (rst_i) begin
-            cnt_q  <= 4'd0;
-            sreg_q <= 10'b0;
+            sync_q <= {NumStages{InitialValue}};
         end else begin
-            cnt_q  <= cnt_d;
-            sreg_q <= sreg_d;
+            sync_q <= sync_d;
         end
     end
 
     // Assign output
-    assign ser_o = sreg_q[0];
-
+    assign sig_o = sync_q[NumStages-1];
 
 endmodule

@@ -69,13 +69,14 @@ module top (
     );
 
     // Create an asynchronous reset release synchronously with clk_ser from the PLL locked signal
-    synchronizer_async_reset #(
+    synchronizer #(
         .InitialValue (1'b1),
         .NumStages    (2)
-    ) inst_synchronizer_async_reset_rst_ser (
-        .clk_dest_i (clk_ser),
-        .rst_src_i  (~clk_ser_locked),
-        .rst_dest_o (rst_ser)
+    ) inst_synchronizer_rst_ser (
+        .clk_i (clk_ser),
+        .rst_i (~clk_ser_locked),
+        .sig_i (~clk_ser_locked),
+        .sig_o (rst_ser)
     );
 
     // There are no more PLL to use, create clk_pxl by dividing the ser_clk by 10
@@ -102,13 +103,14 @@ module top (
     );
 
     // Create an asynchronous reset release synchronously with clk_pxl from the PLL locked signal
-    synchronizer_async_reset #(
+    synchronizer #(
         .InitialValue (1'b1),
         .NumStages    (2)
-    ) inst_synchronizer_async_reset_rst_pxl (
-        .clk_dest_i (clk_pxl),
-        .rst_src_i  (~clk_ser_locked),
-        .rst_dest_o (rst_pxl)
+    ) inst_synchronizer_rst_pxl (
+        .clk_i (clk_pxl),
+        .rst_i (~clk_ser_locked),
+        .sig_i (~clk_ser_locked),
+        .sig_o (rst_pxl)
     );
 
     video_generator #(
@@ -131,7 +133,7 @@ module top (
         .tmds_o (pix_tmds)
     );
 
-    serializer_10_to_1 inst_serializer_10_to_1 (
+    serializer inst_serializer (
         .clk_i  (clk_ser),
         .rst_i  (rst_pxl), // Use rst_pxl to synchronize the serializer with the parallel load
         .d_i    (pix_tmds),
