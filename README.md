@@ -1,1 +1,1 @@
-# uart_controller
+# icestick-playground
