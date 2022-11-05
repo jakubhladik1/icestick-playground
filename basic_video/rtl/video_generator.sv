@@ -115,7 +115,7 @@ module video_generator #(
 
     assign pix_d = !ce_i ? pix_q : // Stall pipeline
                    square_pix ? 1'b1 : 
-                   ~(col_q | row_q) ? 1'b1 : 1'b0;
+                   col_q & row_q ? 1'b1 : 1'b0;
 
     always_ff @(posedge clk_i, posedge rst_i) begin
         if (rst_i) begin
