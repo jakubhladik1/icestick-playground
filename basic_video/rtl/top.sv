@@ -19,29 +19,21 @@
 
 module top (
   input  wire       clk_ref_i,
-  output wire [2:0] tmds_data_po,
-  output wire [2:0] tmds_data_no,
-  output wire       tmds_clk_po,
-  output wire       tmds_clk_no,
+  output wire [3:0] tmds_po,
+  output wire [3:0] tmds_no,
   output wire       led_o
 );
 
     logic clk_ser_raw;
     logic clk_ser_locked;
     logic clk_ser;
+    logic rst_ser_meta;
     logic rst_ser;
-    logic [2:0] cnt_q, cnt_d;
-    logic clk_pxl_d, clk_pxl_q;
-    logic clk_pxl;
-    logic rst_pxl;
-    logic vg_den;
+    logic vg_de;
     logic vg_pix;
-    logic [9:0] pix_tmds;
-    logic pix_ser_re;
-    logic pix_ser_fe;
-    logic ser_rdy;
-    logic clk_ser_re;
-    logic clk_ser_fe;
+    logic dvi_ce;
+    logic [3:0] tmds_re;
+    logic [3:0] tmds_fe;
 
     // Create clk_ser (124.5 MHz) from clk_ref (12 MHz)
     // From Lattice FPGA-TN-02052:
@@ -69,134 +61,64 @@ module top (
     );
 
     // Create an asynchronous reset release synchronously with clk_ser from the PLL locked signal
-    synchronizer #(
-        .InitialValue (1'b1),
-        .NumStages    (2)
-    ) inst_synchronizer_rst_ser (
-        .clk_i (clk_ser),
-        .rst_i (~clk_ser_locked),
-        .sig_i (~clk_ser_locked),
-        .sig_o (rst_ser)
-    );
-
-    // There are no more PLL to use, create clk_pxl by dividing the ser_clk by 10
-    assign cnt_d = (cnt_q == 3'd4) ? 3'd0 : cnt_q + 3'd1;
-
-    assign clk_pxl_d = (cnt_q == 3'd0) ? 1'b1 :
-                       (cnt_q == 3'd4) ? 1'b0 :
-                       clk_pxl_q              ;
-
-    always_ff @(posedge clk_ser, posedge rst_ser) begin
-        if (rst_ser) begin
-            cnt_q     <= 3'b0;
-            clk_pxl_q <= 1'b1;
+    always_ff @(posedge clk_ser, negedge clk_ser_locked) begin
+        if (!clk_ser_locked) begin
+            rst_ser_meta <= 1'b1;
+            rst_ser      <= 1'b1;
         end else begin
-            cnt_q     <= cnt_d;
-            clk_pxl_q <= clk_pxl_d;
+            rst_ser_meta <= ~clk_ser_locked;
+            rst_ser      <= rst_ser_meta;
         end
     end
-
-    // Buffer the generated clk_pxl
-    SB_GB inst_gb_clk_pxl (
-        .USER_SIGNAL_TO_GLOBAL_BUFFER (clk_pxl_q),
-        .GLOBAL_BUFFER_OUTPUT         (clk_pxl)
-    );
-
-    // Create an asynchronous reset release synchronously with clk_pxl from the PLL locked signal
-    synchronizer #(
-        .InitialValue (1'b1),
-        .NumStages    (2)
-    ) inst_synchronizer_rst_pxl (
-        .clk_i (clk_pxl),
-        .rst_i (~clk_ser_locked),
-        .sig_i (~clk_ser_locked),
-        .sig_o (rst_pxl)
-    );
 
     video_generator #(
         .NumColTotal  (10'd800),
         .NumColActive (10'd640),
         .NumRowTotal  (10'd525),
         .NumRowActive (10'd480)
-    ) inst_timing_generator (
+    ) inst_video_generator (
         .clk_i (clk_ser),
         .rst_i (rst_ser),
-        .rdy_i (ser_rdy),
-        .den_o (vg_den),
+        .ce_i  (dvi_ce),
+        .de_o  (vg_de),
         .pix_o (vg_pix)
     );
 
-    tmds_encoder inst_tmds_encoder (
-        .clk_i  (clk_ser),
-        .rst_i  (rst_ser),
-        .rdy_i  (ser_rdy),
-        .de_i   (vg_den),
-        .d_i    (vg_pix),
-        .tmds_o (pix_tmds)
-    );
-
-    serializer_ddr inst_serializer_ddr_tmds_data (
+    dvi_bw inst_dvi_bw (
         .clk_i     (clk_ser),
         .rst_i     (rst_ser),
-        .dat_i     (pix_tmds),
-        .rdy_o     (ser_rdy),
-        .ser_re_o  (pix_ser_re),
-        .ser_fe_o  (pix_ser_fe)
+        .de_i      (vg_de),
+        .dat_i     (vg_pix),
+        .ce_o      (dvi_ce),
+        .tmds_re_o (tmds_re),
+        .tmds_fe_o (tmds_fe)
     );
-
-    // Assign outputs
-    assign led_o = ~rst_pxl;
-
-    // Instantiate three differential data channels using DDR register outputs
+    
+    // Instantiate four differential output channels using DDR output registers inside SB_IO
     genvar i;
     generate
-        for (i = 0; i < 3; i++) begin
+        for (i = 0; i < 4; i++) begin
             SB_IO #(
                 .PIN_TYPE    (6'b010010)
             ) inst_io_tmds_data_p (
-                .PACKAGE_PIN (tmds_data_po[i]),
+                .PACKAGE_PIN (tmds_po[i]),
                 .OUTPUT_CLK  (clk_ser),
-                .D_OUT_0     (pix_ser_fe),
-                .D_OUT_1     (pix_ser_re)
+                .D_OUT_0     (tmds_fe[i]),
+                .D_OUT_1     (tmds_re[i])
             );
 
             SB_IO #(
                 .PIN_TYPE    (6'b010010)
             ) inst_io_tmds_data_n (
-                .PACKAGE_PIN (tmds_data_no[i]),
+                .PACKAGE_PIN (tmds_no[i]),
                 .OUTPUT_CLK  (clk_ser),
-                .D_OUT_0     (~pix_ser_fe),
-                .D_OUT_1     (~pix_ser_re)
+                .D_OUT_0     (~tmds_fe[i]),
+                .D_OUT_1     (~tmds_re[i])
             );
         end
     endgenerate
 
-    // Generate TMDS CLK
-    serializer_ddr inst_serializer_ddr_tmds_clk (
-        .clk_i     (clk_ser),
-        .rst_i     (rst_ser),
-        .dat_i     (10'b1111100000),
-        .rdy_o     ( ),
-        .ser_re_o  (clk_ser_re),
-        .ser_fe_o  (clk_ser_fe)
-    );
-
-    // Instantiate differential pixel clock channel using DDR register output
-    SB_IO #(
-        .PIN_TYPE    (6'b010010)
-    ) inst_io_tmds_clk_p (
-        .PACKAGE_PIN (tmds_clk_po),
-        .OUTPUT_CLK  (clk_ser),
-        .D_OUT_0     (clk_ser_fe),
-        .D_OUT_1     (clk_ser_re)
-    );
-    SB_IO #(
-        .PIN_TYPE    (6'b010010)
-    ) inst_io_tmds_clk_n (
-        .PACKAGE_PIN (tmds_clk_no),
-        .OUTPUT_CLK  (clk_ser),
-        .D_OUT_0     (~clk_ser_fe),
-        .D_OUT_1     (~clk_ser_re)
-    );
+    // Assign outputs
+    assign led_o = ~rst_ser;
 
 endmodule

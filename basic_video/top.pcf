@@ -16,14 +16,14 @@
 #
 
 set_io clk_ref_i 21
-set_io tmds_data_po[0] 79
-set_io tmds_data_no[0] 78
-set_io tmds_data_po[1] 91
-set_io tmds_data_no[1] 90
-set_io tmds_data_po[2] 81
-set_io tmds_data_no[2] 80
-set_io tmds_clk_po 88
-set_io tmds_clk_no 87
+set_io tmds_po[0] 79
+set_io tmds_no[0] 78
+set_io tmds_po[1] 91
+set_io tmds_no[1] 90
+set_io tmds_po[2] 81
+set_io tmds_no[2] 80
+set_io tmds_po[3] 88
+set_io tmds_no[3] 87
 set_io led_o 95
 
 set_frequency clk_ref_i 12

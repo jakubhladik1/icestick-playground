@@ -23,11 +23,11 @@ module video_generator #(
     parameter logic [9:0] NumRowTotal  = 10'd525,
     parameter logic [9:0] NumRowActive = 10'd480
 ) (
-    input  wire clk_i,
-    input  wire rst_i,
-    input  wire rdy_i,
-    output wire den_o,
-    output wire pix_o
+    input  logic clk_i,
+    input  logic rst_i,
+    input  logic ce_i,
+    output logic de_o,
+    output logic pix_o
 );
     
     logic [9:0] row_d, row_q;
@@ -36,7 +36,7 @@ module video_generator #(
     logic row_last;
     logic col_last;
     
-    logic den_q, den_d;
+    logic de_q, de_d;
     
     logic row_active;
     logic col_active;
@@ -49,12 +49,14 @@ module video_generator #(
     assign col_last = (col_q == (NumColTotal-1));
     
     // Creat row counter
-    assign row_d = row_last && col_last ? 10'd0         : // Last pixel of a frame
+    assign row_d = !ce_i                ? row_q         : // Stall pipeline
+                   row_last && col_last ? 10'd0         : // Last pixel of a frame
                    col_last             ? row_q + 10'd1 : // Last pixel of a line
                    row_q                                ; // Not last pixel of a line
     
     // Create column counter
-    assign col_d = col_last ? 10'd0         : // Last pixel of a line
+    assign col_d = !ce_i    ? col_q         : // Stall pipeline
+                   col_last ? 10'd0         : // Last pixel of a line
                               col_q + 10'd1 ; // Not last pixel of a line
     
     always_ff @(posedge clk_i, posedge rst_i) begin
@@ -62,10 +64,8 @@ module video_generator #(
             row_q <= 10'd0;
             col_q <= 10'd0;
         end else begin
-            if (rdy_i) begin
-                row_q <= row_d;
-                col_q <= col_d;
-            end
+            row_q <= row_d;
+            col_q <= col_d;
         end
     end
     
@@ -73,7 +73,7 @@ module video_generator #(
     assign col_active = (col_q < NumColActive);
     
     // Create data enable signal when in active area
-    assign den_d = row_active && col_active;
+    assign de_d = row_active && col_active;
 
     // Create a one pixel thick frame inside the active area
     assign pix_d = (row_q == 10'd0)              || 
@@ -83,18 +83,16 @@ module video_generator #(
 
     always_ff @(posedge clk_i, posedge rst_i) begin
         if (rst_i) begin
-            den_q <= 1'b0;
+            de_q  <= 1'b0;
             pix_q <= 1'b0;
         end else begin
-            if (rdy_i) begin
-                den_q <= den_d;
-                pix_q <= pix_d;
-            end
+            de_q  <= de_d;
+            pix_q <= pix_d;
         end
     end
     
     // Assign output
-    assign den_o = den_q;
+    assign de_o  = de_q;
     assign pix_o = pix_q;
     
 endmodule
