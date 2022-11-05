@@ -20,6 +20,7 @@
 module tmds_encoder (
     input  wire       clk_i,
     input  wire       rst_i,
+    input  wire       rdy_i,
     input  wire       de_i,
     input  wire       d_i,
     output wire [9:0] tmds_o
@@ -39,7 +40,9 @@ module tmds_encoder (
         if (rst_i) begin
             sym_q <= 10'b0;
         end else begin
-            sym_q <= sym_d;
+            if (rdy_i) begin
+                sym_q <= sym_d;
+            end
         end
     end
 

@@ -25,6 +25,7 @@ module video_generator #(
 ) (
     input  wire clk_i,
     input  wire rst_i,
+    input  wire rdy_i,
     output wire den_o,
     output wire pix_o
 );
@@ -61,8 +62,10 @@ module video_generator #(
             row_q <= 10'd0;
             col_q <= 10'd0;
         end else begin
-            row_q <= row_d;
-            col_q <= col_d;
+            if (rdy_i) begin
+                row_q <= row_d;
+                col_q <= col_d;
+            end
         end
     end
     
@@ -83,8 +86,10 @@ module video_generator #(
             den_q <= 1'b0;
             pix_q <= 1'b0;
         end else begin
-            den_q <= den_d;
-            pix_q <= pix_d;
+            if (rdy_i) begin
+                den_q <= den_d;
+                pix_q <= pix_d;
+            end
         end
     end
     

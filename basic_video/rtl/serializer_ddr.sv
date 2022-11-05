@@ -37,41 +37,50 @@
 module serializer_ddr (
     input  wire       clk_i,
     input  wire       rst_i,
-    input  wire [9:0] d_i,
+    input  wire [9:0] dat_i,
+    output wire       rdy_o,
     output wire       ser_re_o,
     output wire       ser_fe_o
 );
 
     logic [2:0] cnt_d, cnt_q;
+    logic       rdy_d, rdy_q;
     logic [4:0] sreg_re_d, sreg_re_q;
     logic [4:0] sreg_fe_d, sreg_fe_q;
 
     // Create a 0-9 counter
     assign cnt_d = cnt_q == 3'd4 ? 3'd0 : cnt_q + 3'd1;
 
+    // Generate a registered rdy output which pulses at the same same time the data is parallel
+    // loaded
+    assign rdy_d = cnt_q == 3'd3 ? 1'b1 : 1'b0;
+
     // Create a shift register which parallel loads all even bits (targeted for rising edge DDR
     // output after cnt_q is 4
-    assign sreg_re_d = cnt_q == 3'd4 ? {d_i[8], d_i[6], d_i[4], d_i[2], d_i[0]} : 
-                                       {1'b0, sreg_re_q[4:1]}                   ;
+    assign sreg_re_d = cnt_q == 3'd4 ? {dat_i[8], dat_i[6], dat_i[4], dat_i[2], dat_i[0]} : 
+                                       {1'b0, sreg_re_q[4:1]}                             ;
 
     // Create a shift register which parallel loads all odd bits (targeted for falling edge DDR
     // output after cnt_q is 4
-    assign sreg_fe_d = cnt_q == 3'd4 ? {d_i[9], d_i[7], d_i[5], d_i[3], d_i[1]} : 
-                                       {1'b0, sreg_fe_q[4:1]}                   ;
+    assign sreg_fe_d = cnt_q == 3'd4 ? {dat_i[9], dat_i[7], dat_i[5], dat_i[3], dat_i[1]} : 
+                                       {1'b0, sreg_fe_q[4:1]}                             ;
 
     always_ff @(posedge clk_i, posedge rst_i) begin
         if (rst_i) begin
             cnt_q     <= 3'd0;
             sreg_re_q <= 5'b0;
             sreg_fe_q <= 5'b0;
+            rdy_q     <= 1'b0;
         end else begin
-            cnt_q  <= cnt_d;
+            cnt_q     <= cnt_d;
+            rdy_q     <= rdy_d;
             sreg_re_q <= sreg_re_d;
             sreg_fe_q <= sreg_fe_d;
         end
     end
 
     // Assign outputs
+    assign rdy_o    = rdy_q; 
     assign ser_re_o = sreg_re_q[0];
     assign ser_fe_o = sreg_fe_q[0];
 

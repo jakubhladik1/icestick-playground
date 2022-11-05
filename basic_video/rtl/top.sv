@@ -39,6 +39,9 @@ module top (
     logic [9:0] pix_tmds;
     logic pix_ser_re;
     logic pix_ser_fe;
+    logic ser_rdy;
+    logic clk_ser_re;
+    logic clk_ser_fe;
 
     // Create clk_ser (124.5 MHz) from clk_ref (12 MHz)
     // From Lattice FPGA-TN-02052:
@@ -116,24 +119,27 @@ module top (
         .NumRowTotal  (10'd525),
         .NumRowActive (10'd480)
     ) inst_timing_generator (
-        .clk_i (clk_pxl),
-        .rst_i (rst_pxl),
+        .clk_i (clk_ser),
+        .rst_i (rst_ser),
+        .rdy_i (ser_rdy),
         .den_o (vg_den),
         .pix_o (vg_pix)
     );
 
     tmds_encoder inst_tmds_encoder (
-        .clk_i  (clk_pxl),
-        .rst_i  (rst_pxl),
+        .clk_i  (clk_ser),
+        .rst_i  (rst_ser),
+        .rdy_i  (ser_rdy),
         .de_i   (vg_den),
         .d_i    (vg_pix),
         .tmds_o (pix_tmds)
     );
 
-    serializer_ddr inst_serializer_ddr (
+    serializer_ddr inst_serializer_ddr_tmds_data (
         .clk_i     (clk_ser),
-        .rst_i     (rst_pxl), // Use rst_pxl to synchronize the serializer with the parallel load
-        .d_i       (pix_tmds),
+        .rst_i     (rst_ser),
+        .dat_i     (pix_tmds),
+        .rdy_o     (ser_rdy),
         .ser_re_o  (pix_ser_re),
         .ser_fe_o  (pix_ser_fe)
     );
@@ -165,24 +171,32 @@ module top (
         end
     endgenerate
 
+    // Generate TMDS CLK
+    serializer_ddr inst_serializer_ddr_tmds_clk (
+        .clk_i     (clk_ser),
+        .rst_i     (rst_ser),
+        .dat_i     (10'b1111100000),
+        .rdy_o     ( ),
+        .ser_re_o  (clk_ser_re),
+        .ser_fe_o  (clk_ser_fe)
+    );
+
     // Instantiate differential pixel clock channel using DDR register output
-    // SB_IO #(
-    //     .PIN_TYPE    (6'b010010)
-    // ) inst_io_tmds_clk_p (
-    //     .PACKAGE_PIN (tmds_clk_po),
-    //     .OUTPUT_CLK  (clk_ser),
-    //     .D_OUT_0     (1'b0),
-    //     .D_OUT_1     (1'b1)
-    // );
-    // SB_IO #(
-    //     .PIN_TYPE    (6'b010010)
-    // ) inst_io_tmds_clk_n (
-    //     .PACKAGE_PIN (tmds_clk_no),
-    //     .OUTPUT_CLK  (clk_ser),
-    //     .D_OUT_0     (1'b1),
-    //     .D_OUT_1     (1'b0)
-    // );
-    assign tmds_clk_po =  clk_pxl;
-    assign tmds_clk_no = ~clk_pxl;
+    SB_IO #(
+        .PIN_TYPE    (6'b010010)
+    ) inst_io_tmds_clk_p (
+        .PACKAGE_PIN (tmds_clk_po),
+        .OUTPUT_CLK  (clk_ser),
+        .D_OUT_0     (clk_ser_fe),
+        .D_OUT_1     (clk_ser_re)
+    );
+    SB_IO #(
+        .PIN_TYPE    (6'b010010)
+    ) inst_io_tmds_clk_n (
+        .PACKAGE_PIN (tmds_clk_no),
+        .OUTPUT_CLK  (clk_ser),
+        .D_OUT_0     (~clk_ser_fe),
+        .D_OUT_1     (~clk_ser_re)
+    );
 
 endmodule
