@@ -40,15 +40,15 @@ build/%.rpt: build/%.asc
 prog: build/$(PROJ).bin
 	iceprog $<
 
-sim: build/Vvideo_generator
-	PYTHONDONTWRITEBYTECODE=1 MODULE=sim/video_generator_tb TESTCASE= TOPLEVEL=video_generator TOPLEVEL_LANG=verilog build/Vtop
+sim: build/Vtop
+	LIBPYTHON_LOC=`cocotb-config --libpython` PYTHONDONTWRITEBYTECODE=1 MODULE=video_generator_tb TESTCASE= TOPLEVEL=video_generator TOPLEVEL_LANG=verilog build/Vtop
 	mv dump.fst build/waveform.fst
 	mv coverage.dat build/coverage.dat
 	mv results.xml build/results.xml
 
-build/Vvideo_generator: rtl/video_generator.sv
+build/Vtop: rtl/video_generator.sv
 	mkdir -p build
-	verilator -cc --build --exe -Mdir build -DCOCOTB_SIM=1 --top-module video_generator --vpi --public-flat-rw --prefix Vtop -o Vtop -LDFLAGS "-Wl,-rpath,`cocotb-config --lib-dir` -L`cocotb-config  --lib-dir` -lcocotbvpi_verilator" --trace-fst --trace-structs --coverage --timescale 1ns/1ps `cocotb-config --share`/lib/verilator/verilator.cpp rtl/video_generator.sv
+	verilator -cc --build --exe -Mdir build --top-module video_generator --vpi --public-flat-rw --prefix Vtop -LDFLAGS "-Wl,-rpath,$(cocotb-config --lib-dir) -L$(cocotb-config --lib-dir) -lcocotbvpi_verilator -lgpi -lcocotb -lgpilog -lcocotbutils" --trace-fst --trace-structs --coverage --timescale 1ns/1ps $(cocotb-config --share)/lib/verilator/verilator.cpp rtl/video_generator.sv
 
 clean:
 	rm -rf build
