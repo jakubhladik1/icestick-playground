@@ -15,33 +15,21 @@
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-PROJ = top
-PIN_DEF = top.pcf
-DEVICE = hx1k
-PACKAGE = tq144
+import cocotb
+from cocotb.clock import Clock
+from cocotb.triggers import RisingEdge, FallingEdge, Timer, ClockCycles
 
-all: $(PROJ).rpt $(PROJ).bin
-
--include build/top.sv.d
-
-build/%.json: rtl/%.sv
-	mkdir -p $(@D)
-	yosys -q -E build/$*.sv.d -p 'read_verilog -sv $< ; hierarchy -top $(PROJ) -libdir rtl ; synth_ice40 -top $(PROJ) -json $@' 
-
-%.asc: $(PIN_DEF) %.json
-	nextpnr-ice40 -q --$(DEVICE) --package $(PACKAGE) --asc $@ --pcf $< --json $*.json
-
-%.bin: build/%.asc
-	icepack $< $@
-
-%.rpt: build/%.asc
-	icetime -d $(DEVICE) -mtr $@ $<
-
-prog: $(PROJ).bin
-	iceprog $<
-
-clean:
-	rm -rf build $(PROJ).rpt $(PROJ).bin
-
-.SECONDARY:
-.PHONY: all prog clean
+@cocotb.test()
+async def test_video_generator(dut):
+    
+    clock = Clock(dut.clk_i, 10, units="ns")
+    cocotb.start_soon(clock.start())
+    dut.rst_i.value = 1
+    await ClockCycles(dut.clk_i, 4, rising=True)
+    dut.rst_i.value = 0
+    await FallingEdge(dut.den_o)
+    await FallingEdge(dut.den_o)
+    await FallingEdge(dut.den_o)
+    await FallingEdge(dut.den_o)
+    await FallingEdge(dut.den_o)
+    await FallingEdge(dut.den_o)
