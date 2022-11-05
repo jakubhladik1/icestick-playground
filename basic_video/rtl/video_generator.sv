@@ -32,6 +32,10 @@ module video_generator #(
     
     logic [9:0] row_d, row_q;
     logic [9:0] col_d, col_q;
+    logic [9:0] square_x_d, square_x_q;
+    logic [9:0] square_y_d, square_y_q;
+    logic square_x_dir_d, square_x_dir_q;
+    logic square_y_dir_d, square_y_dir_q;
     
     logic row_last;
     logic col_last;
@@ -42,6 +46,9 @@ module video_generator #(
     logic col_active;
 
     logic pix_q, pix_d;
+    logic square_pix;
+
+    logic [9:0] frm_d, frm_q;
     
     
     // Create comparators for last row and last column
@@ -58,14 +65,20 @@ module video_generator #(
     assign col_d = !ce_i    ? col_q         : // Stall pipeline
                    col_last ? 10'd0         : // Last pixel of a line
                               col_q + 10'd1 ; // Not last pixel of a line
+
+    assign frm_d = !ce_i                ? frm_q         : // Stall pipeline
+                   row_last && col_last ? frm_q + 10'd1 : // Last pixel of a frame
+                   frm_q                                ;
     
     always_ff @(posedge clk_i, posedge rst_i) begin
         if (rst_i) begin
             row_q <= 10'd0;
             col_q <= 10'd0;
+            frm_q <= 10'd0;
         end else begin
             row_q <= row_d;
             col_q <= col_d;
+            frm_q <= frm_d;
         end
     end
     
@@ -75,19 +88,50 @@ module video_generator #(
     // Create data enable signal when in active area
     assign de_d = row_active && col_active;
 
-    // Create a one pixel thick frame inside the active area
-    assign pix_d = (row_q == 10'd0)              || 
-                   (row_q == NumRowActive-10'b1) ||
-                   (col_q == 10'd0)              ||
-                   (col_q == NumColActive-10'b1)    ? 1'b1 : 1'b0;
+    assign square_x_d = !ce_i                                   ? square_x_q         : // Stall pipeline
+                        row_last && col_last && !square_x_dir_q ? square_x_q + 10'd1 : // End of frame
+                        row_last && col_last && square_x_dir_q  ? square_x_q - 10'd1 : // End of frame
+                        square_x_q;
+
+    assign square_y_d = !ce_i                                   ? square_y_q         : // Stall pipeline
+                        row_last && col_last && !square_y_dir_q ? square_y_q + 10'd1 : // End of frame
+                        row_last && col_last && square_y_dir_q  ? square_y_q - 10'd1 : // End of frame
+                        square_y_q;
+    
+    assign square_x_dir_d = !ce_i                  ? square_x_dir_q : // Stall pipeline
+                            square_x_q == 10'd0    ? 1'b0           :
+                            square_x_q == 10'd607  ? 1'b1           :
+                            square_x_dir_q                          ;
+    
+    assign square_y_dir_d = !ce_i                 ? square_y_dir_q   : // Stall pipeline
+                            square_y_q == 10'd0   ? 1'b0   :
+                            square_y_q == 10'd447 ? 1'b1 :
+                            square_y_dir_q;
+
+    assign square_pix = (row_q > square_y_q) &&
+                   (row_q < square_y_q+32) &&
+                   (col_q > square_x_q) &&
+                   (col_q < square_x_q+32) ? 1'b1 : 1'b0;
+
+    assign pix_d = !ce_i ? pix_q : // Stall pipeline
+                   square_pix ? 1'b1 : 
+                   ~(col_q | row_q) ? 1'b1 : 1'b0;
 
     always_ff @(posedge clk_i, posedge rst_i) begin
         if (rst_i) begin
-            de_q  <= 1'b0;
-            pix_q <= 1'b0;
+            de_q       <= 1'b0;
+            pix_q      <= 1'b0;
+            square_x_q <= 10'b0;
+            square_y_q <= 10'b0;
+            square_x_dir_q <= 1'b0;
+            square_y_dir_q <= 1'b0;
         end else begin
             de_q  <= de_d;
             pix_q <= pix_d;
+            square_x_q <= square_x_d;
+            square_y_q <= square_y_d;
+            square_x_dir_q <= square_x_dir_d;
+            square_y_dir_q <= square_y_dir_d;
         end
     end
     
