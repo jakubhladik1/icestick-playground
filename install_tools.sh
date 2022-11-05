@@ -34,7 +34,7 @@ else
 fi
 
 # Install dependencies for building
-brew install cmake python boost boost-python3 eigen bison flex gawk libffi graphviz pkg-config tcl-tk xdot perl ccache autoconf gperftools libftdi
+brew install cmake python boost boost-python3 eigen bison flex gawk libffi graphviz pkg-config tcl-tk xdot perl ccache autoconf gperftools libftdi bash
 
 # Create a folder for compilation of tools
 mkdir -p tools
@@ -67,7 +67,10 @@ sudo make install
 cd ..
 
 # Download, extract, configure, compile and install verilator
-curl -L https://github.com/verilator/verilator/archive/refs/tags/v5.002.tar.gz > verilator.tar.gz
+
+# cocotb currently only supports 4.106
+# curl -L https://github.com/verilator/verilator/archive/refs/tags/v5.002.tar.gz > verilator.tar.gz
+curl -L https://github.com/verilator/verilator/archive/refs/tags/v4.106.tar.gz > verilator.tar.gz
 tar -xzf verilator.tar.gz
 cd verilator-*
 autoconf
@@ -79,7 +82,7 @@ cd ..
 
 # Install cocotb
 python3 -m pip install --upgrade pip
-pip3 install cocotb
+pip3 install cocotb pytest
 
 # Install gtkwave
 brew install gtkwave
